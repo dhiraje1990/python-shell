@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+import shlex
 
 
 # All commands implemented as shell builtins
@@ -9,7 +10,8 @@ BUILTINS: set[str] = {"exit", "echo", "type", "pwd", "cd"}
 
 def handle_command(command: str) -> None:
     """Parse and execute a shell command, or report it as invalid."""
-    parts: list[str] = command.split()
+    # shlex.split() handles single quotes, keeping quoted strings as one token
+    parts: list[str] = shlex.split(command, posix=True)
 
     # Ignore empty input (user just pressed Enter)
     if not parts:
