@@ -1,48 +1,33 @@
-import os, shlex, subprocess
+import sys
 
-BUILTINS = {"exit", "pwd", "echo", "cd"}
 
-def run(line):
-    parts = shlex.split(line)
-    cmd, args = parts[0], parts[1:]
-    if not run_builtin(cmd, args):
-        run_external(cmd, args)
+def handle_command(command: str) -> None:
+    """Parse and execute a shell command, or report it as invalid."""
+    parts: list[str] = command.split()
 
-def run_builtin(cmd, args):
-    if cmd == "exit":
-        raise SystemExit(0)
-    elif cmd == "pwd":
-        print(os.getcwd())
-    elif cmd == "echo":
-        print(" ".join(args))
-    elif cmd == "cd":
-        path = args[0] if args else os.path.expanduser("~")
-        try:
-            os.chdir(path)
-        except FileNotFoundError:
-            print(f"cd: {path}: No such file or directory")
-    else:
-        return False
-    return True
+    # Ignore empty input (user just pressed Enter)
+    if not parts:
+        return
 
-def run_external(cmd, args):
-    try:
-        subprocess.run([cmd] + args)
-    except FileNotFoundError:
-        print(f"myshell: {cmd}: command not found")
+    cmd: str = parts[0]
 
-def main():
+    # TODO: add known commands here (e.g. exit, echo, pwd, cd...)
+    # For now, everything is treated as an unknown command
+    print(f"{cmd}: command not found")
+
+
+def main() -> None:
+    """Main REPL loop — print prompt, read input, handle command."""
     while True:
-        try:
-            line = input("myshell> ").strip()
-            if not line:
-                continue
-            run(line)
-        except KeyboardInterrupt:
-            print()
-        except EOFError:
-            print("exit")
-            break
+        # Print the shell prompt (no newline, flush immediately)
+        sys.stdout.write("$ ")
+        sys.stdout.flush()
+
+        # Read a line of input from the user
+        command: str = input()
+
+        handle_command(command)
+
 
 if __name__ == "__main__":
     main()
