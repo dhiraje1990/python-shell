@@ -17,8 +17,13 @@ def handle_command(command: str) -> None:
         code: int = int(args[0]) if args else 0
         sys.exit(code)
 
-    # Unknown command — report it
-    print(f"{cmd}: command not found")
+    elif cmd == "echo":
+        # Print all arguments joined by a single space
+        print(" ".join(args))
+
+    else:
+        # Unknown command — report it
+        print(f"{cmd}: command not found")
 
 
 def main() -> None:
