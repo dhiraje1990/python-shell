@@ -10,9 +10,14 @@ def handle_command(command: str) -> None:
         return
 
     cmd: str = parts[0]
+    args: list[str] = parts[1:]
 
-    # TODO: add known commands here (e.g. exit, echo, pwd, cd...)
-    # For now, everything is treated as an unknown command
+    if cmd == "exit":
+        # Use the provided exit code, default to 0 (success)
+        code: int = int(args[0]) if args else 0
+        sys.exit(code)
+
+    # Unknown command — report it
     print(f"{cmd}: command not found")
 
 
