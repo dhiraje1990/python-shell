@@ -8,30 +8,42 @@ import shlex
 BUILTINS: set[str] = {"exit", "echo", "type", "pwd", "cd"}
 
 
-def parse_redirects(parts: list[str]) -> tuple[list[str], str | None, str]:
-    """Extract stdout redirection from token list.
-    Returns (clean_args, output_file, mode) where mode is 'w' or 'a'."""
+def parse_redirects(parts: list[str]) -> tuple[list[str], str | None, str, str | None, str]:
+    """Extract stdout and stderr redirection from token list.
+    Returns (clean_args, stdout_file, stdout_mode, stderr_file, stderr_mode)."""
     clean: list[str] = []
-    output_file: str | None = None
-    mode: str = "w"  # default to overwrite
+    stdout_file: str | None = None
+    stdout_mode: str = "w"
+    stderr_file: str | None = None
+    stderr_mode: str = "w"
 
     i: int = 0
     while i < len(parts):
         if parts[i] == ">>" and i + 1 < len(parts):
-            # Append mode redirection
-            output_file = parts[i + 1]
-            mode = "a"
+            # Append stdout
+            stdout_file = parts[i + 1]
+            stdout_mode = "a"
             i += 2
         elif parts[i] in (">", "1>") and i + 1 < len(parts):
-            # Overwrite mode redirection
-            output_file = parts[i + 1]
-            mode = "w"
+            # Overwrite stdout
+            stdout_file = parts[i + 1]
+            stdout_mode = "w"
+            i += 2
+        elif parts[i] == "2>>" and i + 1 < len(parts):
+            # Append stderr
+            stderr_file = parts[i + 1]
+            stderr_mode = "a"
+            i += 2
+        elif parts[i] == "2>" and i + 1 < len(parts):
+            # Overwrite stderr
+            stderr_file = parts[i + 1]
+            stderr_mode = "w"
             i += 2
         else:
             clean.append(parts[i])
             i += 1
 
-    return clean, output_file, mode
+    return clean, stdout_file, stdout_mode, stderr_file, stderr_mode
 
 
 def handle_command(command: str) -> None:
@@ -43,11 +55,12 @@ def handle_command(command: str) -> None:
     if not parts:
         return
 
-    # Extract any stdout redirection from the token list
-    parts, output_file, mode = parse_redirects(parts)
+    # Extract any stdout/stderr redirection from the token list
+    parts, stdout_file, stdout_mode, stderr_file, stderr_mode = parse_redirects(parts)
 
-    # Open the output file if redirection was requested, else use real stdout
-    out = open(output_file, mode) if output_file else None
+    # Open file handles for redirection, or fall back to real stdout/stderr
+    out = open(stdout_file, stdout_mode) if stdout_file else None
+    err = open(stderr_file, stderr_mode) if stderr_file else None
 
     try:
         cmd: str = parts[0]
@@ -72,7 +85,8 @@ def handle_command(command: str) -> None:
                     if external_path:
                         print(f"{arg} is {external_path}", file=out or sys.stdout)
                     else:
-                        print(f"{arg}: not found", file=out or sys.stdout)
+                        # "not found" is an error, so it goes to stderr
+                        print(f"{arg}: not found", file=err or sys.stderr)
 
         elif cmd == "pwd":
             # Print the current working directory
@@ -81,7 +95,7 @@ def handle_command(command: str) -> None:
         elif cmd == "cd":
             # Require exactly one argument
             if not args:
-                print("cd: missing argument")
+                print("cd: missing argument", file=err or sys.stderr)
                 return
 
             # Expand ~ to the user's home directory
@@ -90,28 +104,31 @@ def handle_command(command: str) -> None:
             try:
                 os.chdir(target)
             except FileNotFoundError:
-                print(f"cd: {target}: No such file or directory")
+                print(f"cd: {target}: No such file or directory", file=err or sys.stderr)
             except NotADirectoryError:
-                print(f"cd: {target}: Not a directory")
+                print(f"cd: {target}: Not a directory", file=err or sys.stderr)
             except PermissionError:
-                print(f"cd: {target}: Permission denied")
+                print(f"cd: {target}: Permission denied", file=err or sys.stderr)
 
         else:
             # Try to find and run the command as an external executable
             external_path: str | None = find_in_path(cmd)
             if external_path:
-                # Pass the output file handle to subprocess if redirecting
                 subprocess.run(
                     [external_path] + args,
-                    stdout=out if out else None
+                    stdout=out if out else None,
+                    stderr=err if err else None,
                 )
             else:
-                print(f"{cmd}: command not found")
+                # Unknown command is an error, so it goes to stderr
+                print(f"{cmd}: command not found", file=err or sys.stderr)
 
     finally:
-        # Always close the file handle if we opened one
+        # Always close file handles if we opened them
         if out:
             out.close()
+        if err:
+            err.close()
 
 
 def find_in_path(cmd: str) -> str | None:
