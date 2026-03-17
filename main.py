@@ -1,5 +1,6 @@
 import sys
 import os
+import subprocess
 
 
 # All commands implemented as shell builtins
@@ -40,8 +41,13 @@ def handle_command(command: str) -> None:
                     print(f"{arg}: not found")
 
     else:
-        # Unknown command — report it
-        print(f"{cmd}: command not found")
+        # Try to find and run the command as an external executable
+        external_path: str | None = find_in_path(cmd)
+        if external_path:
+            # Run the executable, passing along all arguments
+            subprocess.run([external_path] + args)
+        else:
+            print(f"{cmd}: command not found")
 
 
 def find_in_path(cmd: str) -> str | None:
