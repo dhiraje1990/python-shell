@@ -50,7 +50,8 @@ def handle_command(command: str) -> None:
             print("cd: missing argument")
             return
 
-        target: str = args[0]
+        # Expand ~ to the user's home directory
+        target: str = os.path.expanduser(args[0])
 
         try:
             os.chdir(target)
