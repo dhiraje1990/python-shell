@@ -4,7 +4,7 @@ import subprocess
 
 
 # All commands implemented as shell builtins
-BUILTINS: set[str] = {"exit", "echo", "type", "pwd"}
+BUILTINS: set[str] = {"exit", "echo", "type", "pwd", "cd"}
 
 
 def handle_command(command: str) -> None:
@@ -43,6 +43,23 @@ def handle_command(command: str) -> None:
     elif cmd == "pwd":
         # Print the current working directory
         print(os.getcwd())
+
+    elif cmd == "cd":
+        # Require exactly one argument
+        if not args:
+            print("cd: missing argument")
+            return
+
+        target: str = args[0]
+
+        try:
+            os.chdir(target)
+        except FileNotFoundError:
+            print(f"cd: {target}: No such file or directory")
+        except NotADirectoryError:
+            print(f"cd: {target}: Not a directory")
+        except PermissionError:
+            print(f"cd: {target}: Permission denied")
 
     else:
         # Try to find and run the command as an external executable
