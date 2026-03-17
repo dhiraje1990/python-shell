@@ -4,7 +4,7 @@ import subprocess
 
 
 # All commands implemented as shell builtins
-BUILTINS: set[str] = {"exit", "echo", "type"}
+BUILTINS: set[str] = {"exit", "echo", "type", "pwd"}
 
 
 def handle_command(command: str) -> None:
@@ -39,6 +39,10 @@ def handle_command(command: str) -> None:
                     print(f"{arg} is {external_path}")
                 else:
                     print(f"{arg}: not found")
+
+    elif cmd == "pwd":
+        # Print the current working directory
+        print(os.getcwd())
 
     else:
         # Try to find and run the command as an external executable
