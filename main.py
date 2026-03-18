@@ -50,8 +50,8 @@ def display_matches(substitution: str, matches: list[str], longest_match_length:
     # Print matches followed by a newline
     sys.stdout.write("  ".join(sorted(matches)) + chr(10))
 
-    # Reprint the prompt and restore what the user had typed
-    sys.stdout.write(prompt + line_buffer)
+    # Reprint only the prompt — readline will redraw the buffer itself
+    sys.stdout.write(prompt)
     sys.stdout.flush()
 
 def completer(text: str, state: int) -> str | None:
