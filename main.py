@@ -37,6 +37,19 @@ def build_completions() -> None:
     ALL_COMPLETIONS = BUILTINS | get_path_executables()
 
 
+def display_matches(substitution: str, matches: list[str], longest_match_length: int) -> None:
+    """Display all matches on a new line when there are multiple completions."""
+    # Move to a new line so matches appear below the prompt
+    sys.stdout.write("")
+
+    # Print all matches separated by two spaces for readability
+    sys.stdout.write("  ".join(matches))
+
+    # Reprint the prompt and current input so the user can keep typing
+    sys.stdout.write("$ " + readline.get_line_buffer())
+    sys.stdout.flush()
+
+
 def completer(text: str, state: int) -> str | None:
     """Readline completer — suggests builtins and PATH executables matching text."""
     # Filter cached completions to those starting with the text typed so far
@@ -197,6 +210,9 @@ def main() -> None:
     # Register the completer and set tab as the completion key
     readline.set_completer(completer)
     readline.parse_and_bind("tab: complete")
+
+    # Register the display hook for showing multiple matches
+    readline.set_completion_display_matches_hook(display_matches)
 
     while True:
         # Print the shell prompt (no newline, flush immediately)
