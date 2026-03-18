@@ -52,31 +52,70 @@ def longest_common_prefix(strings: list[str]) -> str:
 
 
 def completer(text: str, state: int) -> str | None:
-    """Readline completer with partial completion and manual match display."""
-    # Only compute matches on first call (state==0) per tab press
+    """Readline completer — completes commands on first token, files on arguments."""
+    # Check how much of the line has been typed before the current token
+    line_buffer: str = readline.get_line_buffer()
+    begin: int = readline.get_begidx()
+
+    # If we are completing the first token, complete command names
+    if begin == 0:
+        if state == 0:
+            completer.matches = sorted(c for c in ALL_COMPLETIONS if c.startswith(text))
+
+        matches: list[str] = completer.matches
+
+        # No matches — ring the bell
+        if not matches:
+            if state == 0:
+                sys.stdout.write(chr(7))
+            return None
+
+        # Single match — complete fully with trailing space
+        if len(matches) == 1:
+            return matches[0] + " " if state == 0 else None
+
+        # Multiple matches — find longest common prefix
+        lcp: str = longest_common_prefix(matches)
+
+        if lcp != text:
+            # Complete to LCP silently
+            return lcp if state == 0 else None
+        else:
+            # Already at LCP — print matches and redisplay
+            if state == 0:
+                sys.stdout.write(chr(10) + "  ".join(matches) + chr(10))
+                readline.redisplay()
+            return None
+
+    # Otherwise complete file/directory names using glob
     if state == 0:
-        completer.matches = sorted(c for c in ALL_COMPLETIONS if c.startswith(text))
+        import glob
+        # Match files starting with text, append / to directories
+        raw: list[str] = glob.glob(text + "*")
+        completer.matches = [
+            (m + "/" if os.path.isdir(m) else m) for m in sorted(raw)
+        ]
 
-    matches: list[str] = completer.matches
+    matches = completer.matches
 
-    # No matches — ring the bell
+    # No file matches — ring the bell
     if not matches:
         if state == 0:
             sys.stdout.write(chr(7))
         return None
 
-    # Single match — complete fully with trailing space
+    # Single match — return it directly
     if len(matches) == 1:
-        return matches[0] + " " if state == 0 else None
+        return matches[0] if state == 0 else None
 
-    # Multiple matches — find longest common prefix
+    # Multiple matches — complete to longest common prefix first
     lcp: str = longest_common_prefix(matches)
 
     if lcp != text:
-        # Complete to LCP silently, no list display
+        # Can complete further — return LCP silently
         return lcp if state == 0 else None
     else:
-        # Already at LCP — print matches then let readline redraw prompt+buffer
+        # Already at LCP — show all matches
         if state == 0:
             sys.stdout.write(chr(10) + "  ".join(matches) + chr(10))
             readline.redisplay()
@@ -227,6 +266,8 @@ def main() -> None:
     # Register the completer and set tab as the completion key
     readline.set_completer(completer)
     readline.parse_and_bind("tab: complete")
+    # Ensure / and ~ are not treated as delimiters so full paths are passed to completer
+    readline.set_completer_delims(" \t\n")
 
     # Register the display hook for showing multiple matches
 
