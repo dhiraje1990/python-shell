@@ -37,37 +37,50 @@ def build_completions() -> None:
     ALL_COMPLETIONS = BUILTINS | get_path_executables()
 
 
-def display_matches(substitution: str, matches: list[str], longest_match_length: int) -> None:
-    """Display all matches on a new line when there are multiple completions."""
-    line_buffer: str = readline.get_line_buffer()
-    prompt: str = "$ "
+def longest_common_prefix(strings: list[str]) -> str:
+    """Return the longest common prefix shared by all strings in the list."""
+    if not strings:
+        return ""
+    prefix: str = strings[0]
+    for s in strings[1:]:
+        # Shorten prefix until it matches the start of s
+        while not s.startswith(prefix):
+            prefix = prefix[:-1]
+    return prefix
 
-    # Erase the current line (readline already drew "$ <typed text>" on screen)
-    # chr(13) = carriage return, moves cursor to start of line without newline
-    erase: str = chr(13) + " " * (len(prompt) + len(line_buffer)) + chr(13)
-    sys.stdout.write(erase)
 
-    # Print matches followed by a newline
-    sys.stdout.write("  ".join(sorted(matches)) + chr(10))
 
-    # Reprint only the prompt — readline will redraw the buffer itself
-    sys.stdout.write(prompt)
-    sys.stdout.flush()
 
 def completer(text: str, state: int) -> str | None:
-    """Readline completer — suggests builtins and PATH executables matching text."""
-    # Filter cached completions to those starting with the text typed so far
-    matches: list[str] = sorted(c for c in ALL_COMPLETIONS if c.startswith(text))
+    """Readline completer with partial completion and manual match display."""
+    # Only compute matches on first call (state==0) per tab press
+    if state == 0:
+        completer.matches = sorted(c for c in ALL_COMPLETIONS if c.startswith(text))
 
-    # If no matches, ring the bell on the first state call to indicate no completions
+    matches: list[str] = completer.matches
+
+    # No matches — ring the bell
     if not matches:
         if state == 0:
-            sys.stdout.write("")
-            sys.stdout.flush()
+            sys.stdout.write(chr(7))
         return None
 
-    # readline calls this repeatedly with increasing state until None is returned
-    return matches[state] if state < len(matches) else None
+    # Single match — complete fully with trailing space
+    if len(matches) == 1:
+        return matches[0] + " " if state == 0 else None
+
+    # Multiple matches — find longest common prefix
+    lcp: str = longest_common_prefix(matches)
+
+    if lcp != text:
+        # Complete to LCP silently, no list display
+        return lcp if state == 0 else None
+    else:
+        # Already at LCP — print matches then let readline redraw prompt+buffer
+        if state == 0:
+            sys.stdout.write(chr(10) + "  ".join(matches) + chr(10))
+            readline.redisplay()
+        return None
 
 
 def parse_redirects(parts: list[str]) -> tuple[list[str], str | None, str, str | None, str]:
@@ -216,15 +229,10 @@ def main() -> None:
     readline.parse_and_bind("tab: complete")
 
     # Register the display hook for showing multiple matches
-    readline.set_completion_display_matches_hook(display_matches)
 
     while True:
-        # Print the shell prompt (no newline, flush immediately)
-        sys.stdout.write("$ ")
-        sys.stdout.flush()
-
-        # Read a line of input from the user
-        command: str = input()
+        # Pass prompt to input() so readline knows the cursor offset
+        command: str = input("$ ")
 
         handle_command(command)
 
