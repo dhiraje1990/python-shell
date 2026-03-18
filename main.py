@@ -2,10 +2,20 @@ import sys
 import os
 import subprocess
 import shlex
+import readline
 
 
 # All commands implemented as shell builtins
 BUILTINS: set[str] = {"exit", "echo", "type", "pwd", "cd"}
+
+
+def completer(text: str, state: int) -> str | None:
+    """Readline completer — suggests builtin names that match the current text."""
+    # Find all builtins that start with the text typed so far
+    matches: list[str] = [b for b in BUILTINS if b.startswith(text)]
+
+    # readline calls this repeatedly with increasing state until None is returned
+    return matches[state] if state < len(matches) else None
 
 
 def parse_redirects(parts: list[str]) -> tuple[list[str], str | None, str, str | None, str]:
@@ -146,6 +156,10 @@ def find_in_path(cmd: str) -> str | None:
 
 def main() -> None:
     """Main REPL loop — print prompt, read input, handle command."""
+    # Register the completer and set tab as the completion key
+    readline.set_completer(completer)
+    readline.parse_and_bind("tab: complete")
+
     while True:
         # Print the shell prompt (no newline, flush immediately)
         sys.stdout.write("$ ")
