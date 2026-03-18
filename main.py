@@ -27,13 +27,20 @@ def get_path_executables() -> set[str]:
     return executables
 
 
+# Cache all completions at startup so Tab response is instant
+ALL_COMPLETIONS: set[str] = set()
+
+
+def build_completions() -> None:
+    """Populate ALL_COMPLETIONS with builtins and PATH executables."""
+    global ALL_COMPLETIONS
+    ALL_COMPLETIONS = BUILTINS | get_path_executables()
+
+
 def completer(text: str, state: int) -> str | None:
     """Readline completer — suggests builtins and PATH executables matching text."""
-    # Combine builtins and all executable names from PATH
-    candidates: set[str] = BUILTINS | get_path_executables()
-
-    # Filter to those that start with the text typed so far
-    matches: list[str] = sorted(c for c in candidates if c.startswith(text))
+    # Filter cached completions to those starting with the text typed so far
+    matches: list[str] = sorted(c for c in ALL_COMPLETIONS if c.startswith(text))
 
     # readline calls this repeatedly with increasing state until None is returned
     return matches[state] if state < len(matches) else None
@@ -177,6 +184,9 @@ def find_in_path(cmd: str) -> str | None:
 
 def main() -> None:
     """Main REPL loop — print prompt, read input, handle command."""
+    # Build the completion cache once at startup
+    build_completions()
+
     # Register the completer and set tab as the completion key
     readline.set_completer(completer)
     readline.parse_and_bind("tab: complete")
