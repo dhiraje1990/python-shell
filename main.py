@@ -42,6 +42,13 @@ def completer(text: str, state: int) -> str | None:
     # Filter cached completions to those starting with the text typed so far
     matches: list[str] = sorted(c for c in ALL_COMPLETIONS if c.startswith(text))
 
+    # If no matches, ring the bell on the first state call to indicate no completions
+    if not matches:
+        if state == 0:
+            sys.stdout.write("")
+            sys.stdout.flush()
+        return None
+
     # readline calls this repeatedly with increasing state until None is returned
     return matches[state] if state < len(matches) else None
 
