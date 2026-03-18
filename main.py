@@ -9,10 +9,31 @@ import readline
 BUILTINS: set[str] = {"exit", "echo", "type", "pwd", "cd"}
 
 
+def get_path_executables() -> set[str]:
+    """Return all executable names found in PATH directories."""
+    executables: set[str] = set()
+    path_dirs: list[str] = os.environ.get("PATH", "").split(os.pathsep)
+
+    for directory in path_dirs:
+        try:
+            for name in os.listdir(directory):
+                full_path: str = os.path.join(directory, name)
+                if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
+                    executables.add(name)
+        except PermissionError:
+            # Skip directories we cannot read
+            pass
+
+    return executables
+
+
 def completer(text: str, state: int) -> str | None:
-    """Readline completer — suggests builtin names that match the current text."""
-    # Find all builtins that start with the text typed so far
-    matches: list[str] = [b for b in BUILTINS if b.startswith(text)]
+    """Readline completer — suggests builtins and PATH executables matching text."""
+    # Combine builtins and all executable names from PATH
+    candidates: set[str] = BUILTINS | get_path_executables()
+
+    # Filter to those that start with the text typed so far
+    matches: list[str] = sorted(c for c in candidates if c.startswith(text))
 
     # readline calls this repeatedly with increasing state until None is returned
     return matches[state] if state < len(matches) else None
