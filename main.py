@@ -39,16 +39,20 @@ def build_completions() -> None:
 
 def display_matches(substitution: str, matches: list[str], longest_match_length: int) -> None:
     """Display all matches on a new line when there are multiple completions."""
-    # Move to a new line so matches appear below the prompt
-    sys.stdout.write("")
+    line_buffer: str = readline.get_line_buffer()
+    prompt: str = "$ "
 
-    # Print all matches separated by two spaces for readability
-    sys.stdout.write("  ".join(matches))
+    # Erase the current line (readline already drew "$ <typed text>" on screen)
+    # chr(13) = carriage return, moves cursor to start of line without newline
+    erase: str = chr(13) + " " * (len(prompt) + len(line_buffer)) + chr(13)
+    sys.stdout.write(erase)
 
-    # Reprint the prompt and current input so the user can keep typing
-    sys.stdout.write("$ " + readline.get_line_buffer())
+    # Print matches followed by a newline
+    sys.stdout.write("  ".join(sorted(matches)) + chr(10))
+
+    # Reprint the prompt and restore what the user had typed
+    sys.stdout.write(prompt + line_buffer)
     sys.stdout.flush()
-
 
 def completer(text: str, state: int) -> str | None:
     """Readline completer — suggests builtins and PATH executables matching text."""
