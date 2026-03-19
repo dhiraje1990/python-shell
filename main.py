@@ -82,8 +82,12 @@ def completer(text: str, state: int) -> str | None:
             return lcp if state == 0 else None
         else:
             # Already at LCP — print matches and redisplay
+            # Multiple matches — print matches and redisplay
             if state == 0:
-                sys.stdout.write(chr(10) + "  ".join(matches) + chr(10))
+                sys.stdout.write("\n" + "  ".join(matches) + "\n")
+                sys.stdout.flush()
+                sys.stdout.write("$ " + readline.get_line_buffer())
+                sys.stdout.flush()
                 readline.redisplay()
             return None
 
