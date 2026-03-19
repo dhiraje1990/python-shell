@@ -345,6 +345,10 @@ def find_in_path(cmd: str) -> str | None:
     return None
 
 
+# Path to the history file in the user's home directory
+HISTORY_FILE: str = os.path.join(os.path.expanduser("~"), ".shell_history")
+
+
 def main() -> None:
     """Main REPL loop — print prompt, read input, handle command."""
     # Build the completion cache once at startup
@@ -356,7 +360,9 @@ def main() -> None:
     # Ensure / and ~ are not treated as delimiters so full paths are passed to completer
     readline.set_completer_delims(" \t\n")
 
-    # Register the display hook for showing multiple matches
+    # Load history from file if it exists
+    if os.path.exists(HISTORY_FILE):
+        readline.read_history_file(HISTORY_FILE)
 
     while True:
         # Pass prompt to input() so readline knows the cursor offset
