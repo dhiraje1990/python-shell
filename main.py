@@ -365,10 +365,18 @@ def main() -> None:
         readline.read_history_file(HISTORY_FILE)
 
     while True:
-        # Pass prompt to input() so readline knows the cursor offset
-        command: str = input("$ ")
+        try:
+            # Pass prompt to input() so readline knows the cursor offset
+            command: str = input("$ ")
+        except EOFError:
+            # Ctrl+D — save history and exit cleanly
+            readline.write_history_file(HISTORY_FILE)
+            sys.exit(0)
 
         handle_command(command)
+        
+        # Save history after every command so it's never lost on crash
+        readline.write_history_file(HISTORY_FILE)
 
 
 if __name__ == "__main__":
