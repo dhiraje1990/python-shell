@@ -204,8 +204,17 @@ def run_single(parts: list[str], stdin=None, stdout=None, stderr=None):
             print(os.getcwd(), file=out or sys.stdout)
 
         elif cmd == "history":
-            # Print all commands in readline's history, numbered from 1
-            for idx in range(1, readline.get_current_history_length() + 1):
+            total: int = readline.get_current_history_length()
+
+            # If a number is given, show only the last N entries
+            if args:
+                limit: int = int(args[0])
+                start: int = max(1, total - limit + 1)
+            else:
+                # No argument — show all entries
+                start = 1
+
+            for idx in range(start, total + 1):
                 print(f"  {idx}  {readline.get_history_item(idx)}", file=out or sys.stdout)
 
         elif cmd == "cd":
