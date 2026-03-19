@@ -364,19 +364,25 @@ def main() -> None:
     if os.path.exists(HISTORY_FILE):
         readline.read_history_file(HISTORY_FILE)
 
+    # Remember how many entries were loaded so we only append new ones
+    history_offset: int = readline.get_current_history_length()
+
     while True:
         try:
             # Pass prompt to input() so readline knows the cursor offset
             command: str = input("$ ")
         except EOFError:
-            # Ctrl+D — save history and exit cleanly
-            readline.write_history_file(HISTORY_FILE)
+            # Ctrl+D — exit cleanly (history already appended after each command)
             sys.exit(0)
 
         handle_command(command)
-        
-        # Save history after every command so it's never lost on crash
-        readline.write_history_file(HISTORY_FILE)
+
+        # Append only new entries since startup — preserves other sessions' history
+        readline.append_history_file(
+            readline.get_current_history_length() - history_offset,
+            HISTORY_FILE
+        )
+        history_offset = readline.get_current_history_length()
 
 
 if __name__ == "__main__":
