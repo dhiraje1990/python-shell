@@ -247,30 +247,45 @@ def run_single(parts: list[str], stdin=None, stdout=None, stderr=None):
 
 
 def handle_pipeline(segments: list[list[str]]) -> None:
-    """Execute a list of command segments connected by pipes."""
+    """Execute a list of command segments connected by pipes.
+    Handles both external commands and builtins as pipeline stages."""
     processes: list[subprocess.Popen] = []
-    prev_stdout = None
+    prev_read_fd = None   # read end of previous pipe, passed as stdin to next segment
 
     for i, parts in enumerate(segments):
         is_last: bool = (i == len(segments) - 1)
 
-        # Middle and first segments pipe stdout to next; last segment outputs normally
-        proc = run_single(
-            parts,
-            stdin=prev_stdout,
-            stdout=None if is_last else subprocess.PIPE,
-        )
-
-        if proc:
-            # Close our copy of the previous pipe so the process can detect EOF
-            if prev_stdout:
-                prev_stdout.close()
-            prev_stdout = proc.stdout
-            processes.append(proc)
+        if is_last:
+            # Last segment writes directly to terminal stdout
+            proc = run_single(
+                parts,
+                stdin=os.fdopen(prev_read_fd, "r") if prev_read_fd is not None else None,
+                stdout=None,
+            )
+            if proc:
+                proc.wait()
         else:
-            prev_stdout = None
+            # Create a pipe: write end goes to this segment, read end goes to next
+            read_fd, write_fd = os.pipe()
+            write_file = os.fdopen(write_fd, "w")
 
-    # Wait for all processes to finish
+            proc = run_single(
+                parts,
+                stdin=os.fdopen(prev_read_fd, "r") if prev_read_fd is not None else None,
+                stdout=write_file,
+            )
+
+            # Close the write end in the parent — the child (or builtin) owns it
+            write_file.close()
+
+            if proc:
+                # External command — it writes to write_fd via Popen
+                processes.append(proc)
+
+            # Pass the read end to the next segment
+            prev_read_fd = read_fd
+
+    # Wait for all external processes to finish
     for proc in processes:
         proc.wait()
 
