@@ -160,23 +160,20 @@ def parse_redirects(parts: list[str]) -> tuple[list[str], str | None, str, str |
     return clean, stdout_file, stdout_mode, stderr_file, stderr_mode
 
 
-def handle_command(command: str) -> None:
-    """Parse and execute a shell command, or report it as invalid."""
-    # shlex.split() handles quoting and backslash escaping
-    parts: list[str] = shlex.split(command, posix=True)
-
-    # Ignore empty input (user just pressed Enter)
-    if not parts:
-        return
-
-    # Extract any stdout/stderr redirection from the token list
+def run_single(parts: list[str], stdin=None, stdout=None, stderr=None):
+    """Run a single parsed command with given stdio handles.
+    Returns a subprocess.Popen for external commands, or None for builtins."""
+    # Extract any redirections, leaving only the command and its args
     parts, stdout_file, stdout_mode, stderr_file, stderr_mode = parse_redirects(parts)
 
-    # Open file handles for redirection, or fall back to real stdout/stderr
-    out = open(stdout_file, stdout_mode) if stdout_file else None
-    err = open(stderr_file, stderr_mode) if stderr_file else None
+    # Open redirection files if specified, otherwise use the pipe handles passed in
+    out = open(stdout_file, stdout_mode) if stdout_file else stdout
+    err = open(stderr_file, stderr_mode) if stderr_file else stderr
 
     try:
+        if not parts:
+            return None
+
         cmd: str = parts[0]
         args: list[str] = parts[1:]
 
@@ -210,7 +207,7 @@ def handle_command(command: str) -> None:
             # Require exactly one argument
             if not args:
                 print("cd: missing argument", file=err or sys.stderr)
-                return
+                return None
 
             # Expand ~ to the user's home directory
             target: str = os.path.expanduser(args[0])
@@ -228,9 +225,11 @@ def handle_command(command: str) -> None:
             # Try to find and run the command as an external executable
             external_path: str | None = find_in_path(cmd)
             if external_path:
-                subprocess.run(
+                # Return the Popen object so the caller can chain pipes
+                return subprocess.Popen(
                     [external_path] + args,
-                    stdout=out if out else None,
+                    stdin=stdin,
+                    stdout=out or subprocess.PIPE if stdout == subprocess.PIPE else out,
                     stderr=err if err else None,
                 )
             else:
@@ -238,11 +237,70 @@ def handle_command(command: str) -> None:
                 print(f"{cmd}: command not found", file=err or sys.stderr)
 
     finally:
-        # Always close file handles if we opened them
-        if out:
+        # Only close files we opened ourselves, not passed-in pipe handles
+        if stdout_file and out:
             out.close()
-        if err:
+        if stderr_file and err:
             err.close()
+
+    return None
+
+
+def handle_pipeline(segments: list[list[str]]) -> None:
+    """Execute a list of command segments connected by pipes."""
+    processes: list[subprocess.Popen] = []
+    prev_stdout = None
+
+    for i, parts in enumerate(segments):
+        is_last: bool = (i == len(segments) - 1)
+
+        # Middle and first segments pipe stdout to next; last segment outputs normally
+        proc = run_single(
+            parts,
+            stdin=prev_stdout,
+            stdout=None if is_last else subprocess.PIPE,
+        )
+
+        if proc:
+            # Close our copy of the previous pipe so the process can detect EOF
+            if prev_stdout:
+                prev_stdout.close()
+            prev_stdout = proc.stdout
+            processes.append(proc)
+        else:
+            prev_stdout = None
+
+    # Wait for all processes to finish
+    for proc in processes:
+        proc.wait()
+
+
+def handle_command(command: str) -> None:
+    """Parse and execute a shell command, handling pipes if present."""
+    # shlex.split() handles quoting and backslash escaping
+    parts: list[str] = shlex.split(command, posix=True)
+
+    # Ignore empty input (user just pressed Enter)
+    if not parts:
+        return
+
+    # Split on pipe tokens to get individual command segments
+    segments: list[list[str]] = []
+    current: list[str] = []
+    for token in parts:
+        if token == "|":
+            segments.append(current)
+            current = []
+        else:
+            current.append(token)
+    segments.append(current)
+
+    if len(segments) > 1:
+        # Pipeline — hand off to handle_pipeline
+        handle_pipeline(segments)
+    else:
+        # Single command — run directly
+        run_single(parts)
 
 
 def find_in_path(cmd: str) -> str | None:
