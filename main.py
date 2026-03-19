@@ -6,7 +6,7 @@ import readline
 
 
 # All commands implemented as shell builtins
-BUILTINS: set[str] = {"exit", "echo", "type", "pwd", "cd"}
+BUILTINS: set[str] = {"exit", "echo", "type", "pwd", "cd", "history"}
 
 
 def get_path_executables() -> set[str]:
@@ -202,6 +202,11 @@ def run_single(parts: list[str], stdin=None, stdout=None, stderr=None):
         elif cmd == "pwd":
             # Print the current working directory
             print(os.getcwd(), file=out or sys.stdout)
+
+        elif cmd == "history":
+            # Print all commands in readline's history, numbered from 1
+            for idx in range(1, readline.get_current_history_length() + 1):
+                print(f"  {idx}  {readline.get_history_item(idx)}", file=out or sys.stdout)
 
         elif cmd == "cd":
             # Require exactly one argument
